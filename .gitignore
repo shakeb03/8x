@@ -1,0 +1,4 @@
+.claude/capture.lock
+.claude/capture-errors.log
+.claude/settings.local.json
+.claude/capture-state/
