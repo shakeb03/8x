@@ -9,9 +9,11 @@ export default function Home() {
   const campaigns = getHeroCampaigns();
   const [quadsTop, quadsBottom] = getQuadCards();
   const [deals, ...shelves] = getShelves();
+  // One image per campaign for the Agentic Search landing collage.
+  const ambientImages = [...campaigns.map((c) => c.products[0]), campaigns[0].products[1]].map((p) => p.images[0]);
 
   return (
-    <HomeExperience>
+    <HomeExperience ambientImages={ambientImages}>
       <div className="mx-auto flex max-w-[1500px] flex-col gap-5 px-3 pt-4 md:px-5">
         <ScrollRow label="Featured collections" arrows="tall" className="gap-4">
           {campaigns.map((c, i) => (

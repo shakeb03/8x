@@ -8,7 +8,7 @@ import { SparkleIcon } from "@/components/icons";
  * Switches the homepage between the classic storefront (server-rendered,
  * passed in as children) and the Agentic Search experience.
  */
-export function HomeExperience({ children }: { children: ReactNode }) {
+export function HomeExperience({ children, ambientImages }: { children: ReactNode; ambientImages: string[] }) {
   const [agent, setAgent] = useState(false);
 
   const toggle = (on: boolean) => {
@@ -16,7 +16,7 @@ export function HomeExperience({ children }: { children: ReactNode }) {
     window.scrollTo({ top: 0 });
   };
 
-  if (agent) return <AgentSearch onExit={() => toggle(false)} />;
+  if (agent) return <AgentSearch onExit={() => toggle(false)} ambientImages={ambientImages} />;
 
   return (
     <>

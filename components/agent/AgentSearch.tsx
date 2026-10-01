@@ -1,205 +1,245 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
-import { AgentProductCard } from "@/components/agent/AgentProductCard";
-import { ArrowUpIcon, ChevronIcon, SparkleIcon } from "@/components/icons";
+import { useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
+import { AgentComposer, chipCls } from "@/components/agent/AgentComposer";
+import { AgentHero } from "@/components/agent/AgentHero";
+import { AgentLanding } from "@/components/agent/AgentLanding";
+import { AgentTile } from "@/components/agent/AgentTile";
+import { useAmbientColor } from "@/components/agent/useAmbientColor";
+import { ChevronIcon, SparkleIcon } from "@/components/icons";
 import { askAgent } from "@/lib/agent/actions";
 import { STARTER_PROMPTS } from "@/lib/agent/prompts";
 import type { AgentContext, AgentReply } from "@/lib/agent/types";
 
-type Turn =
-  | { id: number; role: "user"; text: string }
-  | { id: number; role: "agent"; reply: AgentReply };
+type Step = { id: number; query: string; reply: AgentReply };
 
-/** Conversational product search. Each message refines the previous context. */
-export function AgentSearch({ onExit }: { onExit: () => void }) {
-  const [turns, setTurns] = useState<Turn[]>([]);
-  const [context, setContext] = useState<AgentContext | null>(null);
-  const [pending, setPending] = useState(false);
-  const [draft, setDraft] = useState("");
+/**
+ * Desktop mosaic placements by number of secondary results, on a 2×3 grid.
+ * Listed literally so Tailwind can see the classes.
+ */
+const MOSAIC: Record<number, string[]> = {
+  1: ["md:col-span-2 md:row-span-3"],
+  2: ["md:row-span-3", "md:row-span-3"],
+  3: ["md:col-span-2", "md:row-span-2", "md:row-span-2"],
+  4: ["md:row-span-2", "", "", "md:col-span-2"],
+  5: ["md:row-span-2", "", "", "", ""],
+};
+
+type ViewTransitionLike = { ready: Promise<void>; finished: Promise<void>; updateCallbackDone: Promise<void> };
+
+/**
+ * Runs a state update inside a View Transition when the browser supports it.
+ * Transitions can be skipped (hidden tab, a newer transition starting); the
+ * update still applies, so those rejections are expected and ignored.
+ */
+function withTransition(update: () => void) {
+  const doc = document as Document & { startViewTransition?: (cb: () => void) => ViewTransitionLike };
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (!doc.startViewTransition || reduced || document.hidden) return update();
+  const t = doc.startViewTransition(() => flushSync(update));
+  for (const p of [t.ready, t.finished, t.updateCallbackDone]) p.catch(() => {});
+}
+
+/**
+ * Agentic Search, shown as a storefront that rearranges itself: the focused
+ * result is the hero, the rest form a mosaic around it, and the conversation
+ * is reduced to a trail of queries plus a floating prompt.
+ */
+export function AgentSearch({ onExit, ambientImages }: { onExit: () => void; ambientImages: string[] }) {
+  const [steps, setSteps] = useState<Step[]>([]);
+  const [active, setActive] = useState(-1);
+  const [focus, setFocus] = useState<string | null>(null);
+  const [pending, setPending] = useState<string | null>(null);
   const nextId = useRef(0);
-  /** The newest question, so it and its answer are in view together. */
-  const latest = useRef<HTMLLIElement>(null);
   const input = useRef<HTMLInputElement>(null);
+  const caption = useRef<HTMLParagraphElement>(null);
 
   useEffect(() => {
     input.current?.focus();
   }, []);
 
-  // Keep the newest exchange in view.
-  useEffect(() => {
-    latest.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [turns.length, pending]);
+  const step = steps[active];
+  const products = step?.reply.products ?? [];
+  const hero = products.find((p) => p.slug === focus) ?? products[0];
+  const others = products.filter((p) => p !== hero);
+  const ambient = useAmbientColor(hero?.image);
+
+  /** Latest context at or before a step (replies that weren't understood carry none). */
+  const contextAt = (index: number): AgentContext | null => {
+    for (let i = index; i >= 0; i--) if (steps[i].reply.context) return steps[i].reply.context;
+    return null;
+  };
 
   const send = async (text: string) => {
-    const message = text.trim();
-    if (!message || pending) return;
-    setDraft("");
-    setTurns((t) => [...t, { id: nextId.current++, role: "user", text: message }]);
-    setPending(true);
+    const query = text.trim();
+    if (!query || pending) return;
+    const base = active;
+    setPending(query);
+    let reply: AgentReply;
     try {
-      const reply = await askAgent(message, context);
-      if (reply.context) setContext(reply.context);
-      setTurns((t) => [...t, { id: nextId.current++, role: "agent", reply }]);
+      reply = await askAgent(query, contextAt(base));
     } catch {
-      setTurns((t) => [
-        ...t,
-        {
-          id: nextId.current++,
-          role: "agent",
-          reply: { message: "Something went wrong. Please try again.", products: [], context: null, suggestions: [] },
-        },
-      ]);
-    } finally {
-      setPending(false);
-      input.current?.focus();
+      reply = { message: "Something went wrong. Please try again.", products: [], context: null, suggestions: [] };
     }
-  };
-
-  const onSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    send(draft);
-  };
-
-  const restart = () => {
-    setTurns([]);
-    setContext(null);
-    setDraft("");
+    withTransition(() => {
+      // Asking from an earlier step discards the steps after it.
+      setSteps((s) => [...s.slice(0, base + 1), { id: nextId.current++, query, reply }]);
+      setActive(base + 1);
+      setFocus(null);
+      setPending(null);
+    });
+    caption.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     input.current?.focus();
   };
 
-  const started = turns.length > 0;
+  const goTo = (index: number) =>
+    withTransition(() => {
+      setActive(index);
+      setFocus(null);
+    });
 
-  const composer = (
-    <form onSubmit={onSubmit} className="relative w-full">
-      <label htmlFor="agent-input" className="sr-only">
-        Describe what you&apos;re looking for
-      </label>
-      <input
-        id="agent-input"
-        ref={input}
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        maxLength={300}
-        autoComplete="off"
-        placeholder={started ? "Refine: “cheaper”, “under $100”, “only Apple”…" : "Describe what you want, like “a gift for a coffee lover under $50”"}
-        className="h-14 w-full rounded-2xl border border-[#d9d2f7] bg-white pr-14 pl-5 text-base text-[#1b1530] shadow-[0_4px_20px_rgba(60,30,160,.08)] outline-none placeholder:text-[#9a95ad] focus:border-agent focus:ring-4 focus:ring-agent/15"
-      />
-      <button
-        type="submit"
-        disabled={!draft.trim() || pending}
-        aria-label="Send"
-        className="absolute top-1/2 right-2 flex size-10 -translate-y-1/2 items-center justify-center rounded-xl bg-agent text-white transition-colors hover:bg-agent-hover disabled:bg-[#d9d2f7]"
-      >
-        <ArrowUpIcon className="size-5" />
-      </button>
-    </form>
-  );
-
-  const chip =
-    "rounded-full border border-[#d9d2f7] bg-white/80 px-3.5 py-1.5 text-sm text-[#3b2f7a] transition-colors hover:border-agent hover:bg-white disabled:opacity-50";
+  const restart = () => {
+    setSteps([]);
+    setActive(-1);
+    setFocus(null);
+  };
 
   return (
-    <div className="min-h-[calc(100dvh-140px)] bg-[radial-gradient(1200px_500px_at_50%_-10%,#e9e3ff,transparent),linear-gradient(#faf9ff,#f6f8ff)]">
-      <div className="mx-auto flex max-w-5xl flex-col px-4 pb-6">
-        {/* Mode bar */}
-        <div className="flex items-center justify-between py-4">
+    <div
+      className="agent-canvas relative isolate min-h-[calc(100dvh-99px)]"
+      style={{ "--ambient": ambient ?? "#e9e4ff" } as React.CSSProperties}
+    >
+      <div className="mx-auto max-w-[1400px] px-4 md:px-6">
+        {/* Mode bar + query trail */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 py-4">
           <button
             type="button"
             onClick={onExit}
-            className="flex items-center gap-1 text-sm text-[#4a3a9c] hover:text-agent"
+            className="flex items-center gap-1 text-sm text-[#43358f] hover:text-agent"
           >
-            <ChevronIcon direction="left" className="size-4" /> Back to classic shopping
+            <ChevronIcon direction="left" className="size-4" /> Classic shopping
           </button>
-          <div className="flex items-center gap-3">
-            {started && (
-              <button type="button" onClick={restart} className="text-sm text-[#4a3a9c] hover:text-agent">
+
+          {steps.length > 0 && (
+            <nav
+              aria-label="Your searches"
+              className="no-scrollbar order-last flex w-full items-center gap-1 overflow-x-auto md:order-none md:w-auto md:flex-1"
+            >
+              {steps.map((s, i) => (
+                <span key={s.id} className="flex shrink-0 items-center gap-1">
+                  {i > 0 && <ChevronIcon className="size-3 text-[#a59fc0]" />}
+                  <button
+                    type="button"
+                    onClick={() => goTo(i)}
+                    aria-current={i === active ? "step" : undefined}
+                    className={`rounded-full px-3 py-1 text-sm transition-colors ${
+                      i === active
+                        ? "bg-[#17122b] text-white"
+                        : i < active
+                          ? "bg-white/70 text-[#3b2f7a] hover:bg-white"
+                          : "bg-white/40 text-[#8d88a3] hover:bg-white/70"
+                    }`}
+                  >
+                    {s.query}
+                  </button>
+                </span>
+              ))}
+            </nav>
+          )}
+
+          <div className="ml-auto flex items-center gap-3">
+            {steps.length > 0 && (
+              <button type="button" onClick={restart} className="text-sm text-[#43358f] hover:text-agent">
                 New search
               </button>
             )}
-            <span className="flex items-center gap-1 rounded-full bg-agent-soft px-2.5 py-1 text-xs font-semibold text-agent">
+            <span className="hidden items-center gap-1 rounded-full bg-white/70 px-2.5 py-1 text-xs font-semibold text-agent backdrop-blur sm:flex">
               <SparkleIcon className="size-3.5" /> Agentic Search · beta
             </span>
           </div>
         </div>
 
-        {!started ? (
-          <div className="mx-auto flex w-full max-w-2xl flex-col items-center pt-12 pb-16 text-center md:pt-20">
-            <span className="mb-5 flex size-12 items-center justify-center rounded-2xl bg-agent text-white shadow-[0_8px_24px_rgba(91,63,214,.35)]">
-              <SparkleIcon className="size-6" />
-            </span>
-            <h1 className="font-display text-3xl font-extrabold tracking-tight text-[#1b1530] md:text-4xl">
-              What are you shopping for?
-            </h1>
-            <p className="mt-2 max-w-md text-[#6b6684]">
-              Describe it the way you&apos;d tell a friend. Mention a budget, a brand, or who it&apos;s for, then
-              refine as you go.
-            </p>
-            <div className="mt-8 w-full">{composer}</div>
-            <div className="mt-5 flex flex-wrap justify-center gap-2">
-              {STARTER_PROMPTS.map((p) => (
-                <button key={p} type="button" onClick={() => send(p)} className={chip}>
-                  {p}
-                </button>
-              ))}
-            </div>
-          </div>
+        {!step ? (
+          <AgentLanding images={ambientImages}>
+            <AgentComposer
+              variant="hero"
+              inputRef={input}
+              onSend={send}
+              pending={pending !== null}
+              suggestions={STARTER_PROMPTS}
+              placeholder="Describe what you want, like “a gift for a coffee lover under $50”"
+            />
+            {pending && (
+              <p className="mt-4 text-sm text-[#5f5a78]" role="status">
+                Arranging the store around “{pending}”…
+              </p>
+            )}
+          </AgentLanding>
         ) : (
           <>
-            <ol className="flex flex-col gap-6 pb-6" aria-live="polite">
-              {turns.map((turn, i) => {
-                const isLatest = i === turns.length - 1;
-                const isLastQuestion = turn.role === "user" && !turns.slice(i + 1).some((t) => t.role === "user");
-                return (
-                  <li key={turn.id} ref={isLastQuestion ? latest : undefined} className="scroll-mt-4">
-                    {turn.role === "user" ? (
-                      <div className="flex justify-end">
-                        <p className="max-w-[80%] rounded-2xl rounded-br-md bg-agent px-4 py-2.5 text-white">
-                          {turn.text}
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col gap-4">
-                        <div className="flex items-start gap-3">
-                          <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-agent text-white">
-                            <SparkleIcon className="size-4" />
-                          </span>
-                          <p className="text-[15px] leading-relaxed text-[#1b1530]">{turn.reply.message}</p>
-                        </div>
-                        {turn.reply.products.length > 0 && (
-                          <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                            {turn.reply.products.map((p) => (
-                              <li key={p.slug} className="grid">
-                                <AgentProductCard product={p} />
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                        {isLatest && turn.reply.suggestions.length > 0 && (
-                          <div className="flex flex-wrap gap-2 pl-10">
-                            {turn.reply.suggestions.map((s) => (
-                              <button key={s} type="button" onClick={() => send(s)} disabled={pending} className={chip}>
-                                {s}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </li>
-                );
-              })}
-              {pending && (
-                <li className="flex items-center gap-3 text-sm text-[#6b6684]" role="status">
-                  <span className="flex size-7 items-center justify-center rounded-lg bg-agent-soft text-agent">
-                    <SparkleIcon className="size-4 animate-pulse" />
-                  </span>
-                  Looking through the catalog…
-                </li>
-              )}
-            </ol>
+            {/* The agent's reply, as a caption rather than a chat bubble */}
+            <p
+              key={step.id}
+              ref={caption}
+              aria-live="polite"
+              className="agent-rise flex scroll-mt-4 items-start gap-2 pb-4 text-[15px] text-[#2a2342] md:text-base"
+            >
+              <SparkleIcon className="mt-1 size-4 shrink-0 text-agent" />
+              <span>{pending ? `Rearranging for “${pending}”…` : step.reply.message}</span>
+            </p>
 
-            <div className="sticky bottom-4 z-10">{composer}</div>
+            <div
+              className={`transition-[opacity,filter] duration-300 ${pending ? "pointer-events-none opacity-50 blur-[2px]" : ""}`}
+              aria-busy={pending !== null}
+            >
+              {hero ? (
+                <div
+                  className={`grid gap-4 md:h-[clamp(440px,calc(100dvh-360px),680px)] ${
+                    others.length ? "md:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]" : "md:mx-auto md:max-w-3xl"
+                  }`}
+                >
+                  <AgentHero product={hero} />
+                  {others.length > 0 && (
+                    <div className="grid grid-cols-2 gap-3 md:h-full md:grid-rows-3">
+                      {others.map((p, i) => (
+                        <AgentTile
+                          key={`${step.id}-${p.slug}`}
+                          product={p}
+                          index={i}
+                          onFocus={() => withTransition(() => setFocus(p.slug))}
+                          className={`aspect-square md:aspect-auto ${MOSAIC[others.length]?.[i] ?? ""}`}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="agent-rise mx-auto my-10 max-w-xl rounded-3xl bg-white/70 p-8 text-center ring-1 ring-white/70 backdrop-blur-xl">
+                  <SparkleIcon className="mx-auto mb-3 size-6 text-agent" />
+                  <p className="text-[#2a2342]">Try one of these, or describe it another way.</p>
+                  <div className="mt-4 flex flex-wrap justify-center gap-2">
+                    {step.reply.suggestions.map((s) => (
+                      <button key={s} type="button" onClick={() => send(s)} className={chipCls}>
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Floating prompt */}
+            <div className="sticky bottom-0 z-20 mx-auto max-w-2xl pt-6 pb-4">
+              <AgentComposer
+                variant="dock"
+                inputRef={input}
+                onSend={send}
+                pending={pending !== null}
+                suggestions={hero ? step.reply.suggestions : []}
+                placeholder="Refine: “cheaper”, “under $100”, “only Apple”…"
+              />
+            </div>
           </>
         )}
       </div>

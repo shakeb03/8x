@@ -52,3 +52,64 @@ body {
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+/* --- Agentic Search ------------------------------------------------------- */
+
+/* Registered so the ambient tint can animate between searches. */
+@property --ambient {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #e9e4ff;
+}
+
+.agent-canvas {
+  transition: --ambient 900ms ease;
+  background:
+    radial-gradient(1000px 700px at 28% 35%, color-mix(in oklab, var(--ambient) 85%, white), transparent 72%),
+    radial-gradient(800px 600px at 85% 75%, color-mix(in oklab, var(--ambient) 50%, #f3f0ff), transparent 70%),
+    linear-gradient(#fbfaff, #f5f6fb);
+}
+
+@keyframes agent-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes agent-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(var(--tilt, 0deg));
+  }
+  50% {
+    transform: translate3d(0, -16px, 0) rotate(calc(var(--tilt, 0deg) + 3deg));
+  }
+}
+
+.agent-rise {
+  animation: agent-rise 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.agent-drift {
+  animation: agent-drift 10s ease-in-out infinite;
+}
+
+::view-transition-group(*) {
+  animation-duration: 450ms;
+  animation-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-rise,
+  .agent-drift {
+    animation: none;
+  }
+  .agent-canvas {
+    transition: none;
+  }
+}
