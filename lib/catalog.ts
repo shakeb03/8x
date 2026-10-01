@@ -4,7 +4,7 @@
 import productsData from "@/data/products.json";
 import categoriesData from "@/data/categories.json";
 import { UNFEATURED_CATEGORIES } from "./site";
-import type { Category, Product } from "./types";
+import type { CartProduct, Category, Product } from "./types";
 
 const products = productsData as Product[];
 // DummyJSON names lack apostrophes ("Womens Dresses").
@@ -79,4 +79,23 @@ export function getRelated(product: Product, departmentCategories: string[], lim
     .filter((p) => p.category !== product.category && departmentCategories.includes(p.category))
     .toSorted(byPopularity);
   return [...sameCategory, ...sameDepartment].slice(0, limit);
+}
+
+/** Slim lookup of every product for the client-side cart, keyed by slug. */
+export function getCartCatalog(): Record<string, CartProduct> {
+  return Object.fromEntries(
+    products.map((p) => [
+      p.slug,
+      {
+        slug: p.slug,
+        title: p.title,
+        brand: p.brand,
+        price: p.price,
+        discountPercentage: p.discountPercentage,
+        stock: p.stock,
+        availabilityStatus: p.availabilityStatus,
+        thumbnail: p.thumbnail,
+      },
+    ]),
+  );
 }

@@ -4,9 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { CaretDownIcon } from "@/components/icons";
-import { useCartStore } from "@/lib/cart-store";
-
-const MAX_QUANTITY = 10;
+import { MAX_QUANTITY, useCartStore } from "@/lib/cart-store";
 
 export function BuyActions({ slug, stock }: { slug: string; stock: number }) {
   const add = useCartStore((s) => s.add);

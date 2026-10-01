@@ -19,7 +19,7 @@ export function listPrice(product: Product): number {
 }
 
 /** Whole-number discount, or 0 when it's too small to advertise. */
-export function savingsPercent(product: Product): number {
+export function savingsPercent(product: Pick<Product, "discountPercentage">): number {
   const pct = Math.round(product.discountPercentage);
   return pct >= 5 ? pct : 0;
 }

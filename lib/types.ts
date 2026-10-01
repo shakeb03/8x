@@ -29,6 +29,12 @@ export type Product = {
   images: string[];
 };
 
+/** The slice of a product the client-side cart needs to render a line. */
+export type CartProduct = Pick<
+  Product,
+  "slug" | "title" | "brand" | "price" | "discountPercentage" | "stock" | "availabilityStatus" | "thumbnail"
+>;
+
 export type Category = {
   slug: string;
   name: string;

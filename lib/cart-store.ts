@@ -6,6 +6,11 @@ import { persist } from "zustand/middleware";
 
 export type CartItem = { slug: string; quantity: number };
 
+/** Per-item limit, like Amazon's quantity dropdown. Stock may lower it further. */
+export const MAX_QUANTITY = 10;
+
+const clamp = (n: number) => Math.min(MAX_QUANTITY, n);
+
 type CartState = {
   items: CartItem[];
   add: (slug: string, quantity?: number) => void;
@@ -21,10 +26,10 @@ export const useCartStore = create<CartState>()(
       add: (slug, quantity = 1) =>
         set((s) => {
           const existing = s.items.find((i) => i.slug === slug);
-          if (!existing) return { items: [...s.items, { slug, quantity }] };
+          if (!existing) return { items: [...s.items, { slug, quantity: clamp(quantity) }] };
           return {
             items: s.items.map((i) =>
-              i.slug === slug ? { ...i, quantity: i.quantity + quantity } : i,
+              i.slug === slug ? { ...i, quantity: clamp(i.quantity + quantity) } : i,
             ),
           };
         }),
@@ -33,7 +38,7 @@ export const useCartStore = create<CartState>()(
           items:
             quantity <= 0
               ? s.items.filter((i) => i.slug !== slug)
-              : s.items.map((i) => (i.slug === slug ? { ...i, quantity } : i)),
+              : s.items.map((i) => (i.slug === slug ? { ...i, quantity: clamp(quantity) } : i)),
         })),
       remove: (slug) => set((s) => ({ items: s.items.filter((i) => i.slug !== slug) })),
       clear: () => set({ items: [] }),
