@@ -1,7 +1,7 @@
 // Store-wide config: brand name and how DummyJSON categories roll up into
 // the departments shown in the header, search scope and homepage.
 
-export const BRAND = "nile";
+export const BRAND = "Amazon";
 
 export type Department = {
   slug: string;
