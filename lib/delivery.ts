@@ -14,7 +14,11 @@ const BUSINESS_DAYS: Record<string, number> = {
   "Ships in 1 month": 22,
 };
 
-function addBusinessDays(from: Date, days: number): Date {
+export function shippingDays(product: Pick<Product, "shippingInformation">): number {
+  return BUSINESS_DAYS[product.shippingInformation] ?? 5;
+}
+
+export function addBusinessDays(from: Date, days: number): Date {
   const d = new Date(from);
   let left = days;
   while (left > 0) {
@@ -26,17 +30,21 @@ function addBusinessDays(from: Date, days: number): Date {
 }
 
 const dateFmt = new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric" });
+const longDateFmt = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric" });
 
-export function deliveryDate(product: Product, from = new Date()): string {
-  const days = BUSINESS_DAYS[product.shippingInformation] ?? 5;
-  return dateFmt.format(addBusinessDays(from, days));
+export function formatDeliveryDate(date: Date, style: "short" | "long" = "short"): string {
+  return (style === "long" ? longDateFmt : dateFmt).format(date);
 }
 
-/** True when the item ships fast enough to show a "Prime"-style badge. */
+export function deliveryDate(product: Pick<Product, "shippingInformation">, from = new Date()): string {
+  return formatDeliveryDate(addBusinessDays(from, shippingDays(product)));
+}
+
+/** True when the item ships fast enough to show a fast-delivery note. */
 export function isFastShipping(product: Product): boolean {
-  return (BUSINESS_DAYS[product.shippingInformation] ?? 99) <= 2;
+  return shippingDays(product) <= 2;
 }
 
-export function shippingCost(product: Product): number {
+export function shippingCost(product: Pick<Product, "price">): number {
   return product.price >= FREE_SHIPPING_THRESHOLD ? 0 : STANDARD_SHIPPING;
 }

@@ -95,6 +95,7 @@ export function getCartCatalog(): Record<string, CartProduct> {
         stock: p.stock,
         availabilityStatus: p.availabilityStatus,
         thumbnail: p.thumbnail,
+        shippingInformation: p.shippingInformation,
       },
     ]),
   );

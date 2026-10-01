@@ -3,16 +3,12 @@
 import Image from "next/image";
 import Link from "next/link";
 import { QuantityStepper } from "@/components/cart/QuantityStepper";
-import { MAX_QUANTITY, useCartStore, useHydrated } from "@/lib/cart-store";
+import { buildCartLines, isUnavailable, maxQuantity, summarizeLines } from "@/lib/cart-lines";
+import { useCartStore, useHydrated } from "@/lib/cart-store";
 import { FREE_SHIPPING_THRESHOLD } from "@/lib/delivery";
 import { formatPrice, savingsPercent } from "@/lib/format";
 import type { CartProduct } from "@/lib/types";
 import { Price } from "@/components/product/Price";
-
-type Line = { product: CartProduct; quantity: number };
-
-const isUnavailable = (p: CartProduct) => p.stock === 0 || p.availabilityStatus === "Out of Stock";
-const maxQuantity = (p: CartProduct) => Math.max(1, Math.min(MAX_QUANTITY, p.stock));
 
 export function CartView({ catalog }: { catalog: Record<string, CartProduct> }) {
   const hydrated = useHydrated();
@@ -22,17 +18,10 @@ export function CartView({ catalog }: { catalog: Record<string, CartProduct> }) 
 
   if (!hydrated) return <CartSkeleton />;
 
-  // Items whose product no longer exists in the catalog are ignored, and
-  // quantities are capped at current stock.
-  const lines: Line[] = items.flatMap((i) => {
-    const product = catalog[i.slug];
-    return product ? [{ product, quantity: Math.min(i.quantity, maxQuantity(product)) }] : [];
-  });
+  const lines = buildCartLines(items, catalog);
   if (lines.length === 0) return <EmptyCart />;
 
-  const purchasable = lines.filter((l) => !isUnavailable(l.product));
-  const count = purchasable.reduce((n, l) => n + l.quantity, 0);
-  const subtotal = purchasable.reduce((sum, l) => sum + l.product.price * l.quantity, 0);
+  const { count, subtotal } = summarizeLines(lines);
   const subtotalLabel = (
     <>
       Subtotal ({count} {count === 1 ? "item" : "items"}):{" "}

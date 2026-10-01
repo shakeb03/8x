@@ -6,8 +6,10 @@ import { persist } from "zustand/middleware";
 
 export type CartItem = { slug: string; quantity: number };
 
+import { MAX_QUANTITY } from "./cart-lines";
+
 /** Per-item limit, like Amazon's quantity dropdown. Stock may lower it further. */
-export const MAX_QUANTITY = 10;
+export { MAX_QUANTITY };
 
 const clamp = (n: number) => Math.min(MAX_QUANTITY, n);
 
