@@ -65,3 +65,18 @@ export function getRatingCount(product: Product): number {
 export function getPopularity(product: Product): number {
   return product.rating * Math.log10(getRatingCount(product));
 }
+
+/**
+ * Products to show alongside one: same category first, then the rest of its
+ * department, most popular first.
+ */
+export function getRelated(product: Product, departmentCategories: string[], limit: number): Product[] {
+  const byPopularity = (a: Product, b: Product) => getPopularity(b) - getPopularity(a);
+  const sameCategory = products
+    .filter((p) => p.category === product.category && p.id !== product.id)
+    .toSorted(byPopularity);
+  const sameDepartment = products
+    .filter((p) => p.category !== product.category && departmentCategories.includes(p.category))
+    .toSorted(byPopularity);
+  return [...sameCategory, ...sameDepartment].slice(0, limit);
+}

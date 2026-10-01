@@ -56,3 +56,7 @@ export const DEPARTMENTS: Department[] = [
 // Categories that exist in the seed data but don't belong on a shopping
 // homepage (cars, motorcycles). Still reachable by search.
 export const UNFEATURED_CATEGORIES = new Set(["vehicle", "motorcycle"]);
+
+export function getDepartmentForCategory(category: string): Department | undefined {
+  return DEPARTMENTS.find((d) => d.categories.includes(category));
+}
