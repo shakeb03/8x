@@ -20,3 +20,8 @@ export const useOrdersStore = create<OrdersState>()(
     { name: "orders" },
   ),
 );
+
+/** A single persisted order by id (undefined until hydrated or if missing). */
+export function useOrder(id: string): Order | undefined {
+  return useOrdersStore((s) => s.orders.find((o) => o.id === id));
+}
