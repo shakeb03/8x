@@ -3,7 +3,7 @@
 // products from the local catalog. No LLM; everything here is deterministic,
 // so the same function signature can later be backed by a model.
 
-import { getPopularity, getProducts, getRatingCount } from "../catalog";
+import { getCategories, getPopularity, getProducts, getRatingCount } from "../catalog";
 import { deliveryDate, isFastShipping } from "../delivery";
 import { formatPrice, listPrice, savingsPercent } from "../format";
 import { matchConcepts, tokenize } from "../search";
@@ -32,7 +32,7 @@ const STOPWORDS = new Set(
      cheap cheaper cheapest expensive pricier premium budget affordable rated rating stars star
      sale deal deals discount discounted between max min maximum minimum up no not except without
      dad mom mother father friend wife husband son daughter boyfriend girlfriend kid kids him her
-     work everyday daily use using occasion`,
+     work everyday daily use using occasion instead else other different besides rather`,
   ),
 );
 
@@ -192,8 +192,13 @@ type Parsed = {
   reset: boolean;
   topicWords: string[];
   concepts: string[][];
+  /** The stemmed word each concept came from, aligned with `concepts`. */
+  conceptTokens: string[];
   categories: string[];
 };
+
+/** Ways of saying "not this brand": "anything but Apple", "I don't want Nike", "non-Apple"… */
+const EXCLUDE = String.raw`(?:not\s+from|not|non|no|except(?:\s+for)?|without|excluding|other\s+than|besides|apart\s+from|but|instead\s+of|rather\s+than|isn[’']?t|is\s+not|(?:don[’']?t|do\s+not)\s+want|(?:a\s+)?different(?:\s+brand)?\s+(?:than|from))`;
 
 const num = (s: string) => Number(s.replace(/,/g, ""));
 const PRICE = String.raw`\$?\s*(\d[\d,]*(?:\.\d+)?)\s*(?:dollars?|bucks|usd)?`;
@@ -220,6 +225,7 @@ function parse(message: string): Parsed {
     reset: false,
     topicWords: [],
     concepts: [],
+    conceptTokens: [],
     categories: [],
   };
 
@@ -258,7 +264,7 @@ function parse(message: string): Parsed {
     tokenize(text).some((t) => !STOPWORDS.has(t) && !BRANDS.some((b) => tokenize(b).includes(t)));
   for (const brand of BRANDS) {
     const b = escape(brand.toLowerCase());
-    if (take(new RegExp(String.raw`\b(?:not|no|except|without|excluding|other than)\s+${b}\b`))) {
+    if (take(new RegExp(String.raw`\b${EXCLUDE}(?:\s+|-)(?:any\s+)?${b}\b`))) {
       p.excludeBrands.push(brand);
     }
   }
@@ -296,9 +302,68 @@ function parse(message: string): Parsed {
     if (seen.has(t)) continue;
     seen.add(t);
     p.concepts.push(SYNONYM_INDEX.get(t) ?? [t]);
+    p.conceptTokens.push(t);
     for (const c of CATEGORY_INDEX.get(t) ?? []) if (!p.categories.includes(c)) p.categories.push(c);
   }
   return p;
+}
+
+// --- Follow-up classification ----------------------------------------------
+
+/** Descriptors: they narrow the current product rather than name a new one. */
+const MODIFIERS = new Set(
+  tokenize(
+    `red black white blue green gold golden silver grey gray pink yellow brown purple orange beige navy
+     dark light bright plain classic pro max mini plus new small large big wireless leather cotton`,
+  ),
+);
+
+const BRAND_TOKENS = new Set(BRANDS.flatMap((b) => tokenize(b)));
+
+/** Every word the catalog uses to name or tag things. */
+const CATALOG_VOCAB = new Set([
+  ...getProducts().flatMap((p) => tokenize(`${p.title} ${p.tags.join(" ")}`)),
+  ...getCategories().flatMap((c) => tokenize(c.name)),
+]);
+
+/** Names a kind of product ("earphones", "wok", "laptop"), not a quality of one. */
+function isProductWord(t: string): boolean {
+  if (MODIFIERS.has(t) || BRAND_TOKENS.has(t) || /^\d+$/.test(t)) return false;
+  return SYNONYM_INDEX.has(t) || CATEGORY_INDEX.has(t) || CATALOG_VOCAB.has(t);
+}
+
+/** A word the catalog (or our synonym list) knows at all. Others are filler. */
+function isKnownWord(t: string): boolean {
+  return CATALOG_VOCAB.has(t) || SYNONYM_INDEX.has(t) || CATEGORY_INDEX.has(t) || MODIFIERS.has(t);
+}
+
+/**
+ * Does this follow-up refine the current search, or start a new one? It's a
+ * new search only when it names a different kind of product, or when it's
+ * nothing but unfamiliar words with no constraint at all ("tents"). Filler
+ * like "anything but", "other options", "isn't" never resets the subject.
+ */
+function isRefinement(p: Parsed, context: AgentContext | null): boolean {
+  if (p.reset || !context) return false;
+  const current = new Set(context.intent.concepts.flat());
+  const namesNewProduct = p.conceptTokens.some(
+    (t) => isProductWord(t) && !(SYNONYM_INDEX.get(t) ?? [t]).some((term) => current.has(term)),
+  );
+  if (namesNewProduct) return false;
+
+  const hasConstraint =
+    p.minPrice !== null ||
+    p.maxPrice !== null ||
+    p.minRating !== null ||
+    p.deals ||
+    p.sort !== null ||
+    p.cheaper ||
+    p.pricier ||
+    p.brands.length > 0 ||
+    p.excludeBrands.length > 0 ||
+    p.clearBrands;
+  const onlyUnfamiliar = p.conceptTokens.length > 0 && !p.conceptTokens.some(isKnownWord);
+  return hasConstraint || !onlyUnfamiliar;
 }
 
 // --- Intent ------------------------------------------------------------------
@@ -324,17 +389,26 @@ function emptyIntent(): AgentIntent {
 }
 
 /**
- * New subject → fresh intent. Only modifiers ("cheaper", "under $100",
- * "only Apple") → refine the previous intent.
+ * A new kind of product → fresh intent. Anything else ("cheaper", "under
+ * $100", "anything but Apple", "in red") → refine the current intent.
  */
 function resolveIntent(p: Parsed, context: AgentContext | null): { intent: AgentIntent; refined: boolean } {
-  const refining = !p.reset && context !== null && p.concepts.length === 0;
-  const intent: AgentIntent = refining ? { ...context.intent } : emptyIntent();
+  const refining = isRefinement(p, context);
+  const intent: AgentIntent = refining && context ? { ...context.intent } : emptyIntent();
 
   if (!refining) {
     intent.topic = p.topicWords.join(" ");
     intent.concepts = p.concepts;
     intent.categories = p.categories;
+  } else {
+    // Descriptors the catalog knows ("red", "wireless") narrow the current
+    // product; unfamiliar filler words are dropped.
+    const current = new Set(intent.concepts.flat());
+    p.conceptTokens.forEach((t, i) => {
+      if (!isKnownWord(t) || current.has(t)) return;
+      intent.concepts = [...intent.concepts, p.concepts[i]];
+      intent.topic = `${intent.topic} ${t}`.trim();
+    });
   }
   if (p.minPrice !== null) intent.minPrice = p.minPrice;
   if (p.maxPrice !== null) intent.maxPrice = p.maxPrice;
@@ -354,7 +428,7 @@ function resolveIntent(p: Parsed, context: AgentContext | null): { intent: Agent
     intent.brands = intent.brands.filter((b) => !p.excludeBrands.includes(b));
   }
 
-  const shown = refining ? context.shownPrices : [];
+  const shown = refining && context ? context.shownPrices : [];
   if (p.cheaper) {
     if (shown.length) {
       // Below the middle of what was just shown (or below the only item).
