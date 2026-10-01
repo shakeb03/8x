@@ -26,6 +26,13 @@
   --color-link-hover: #c7511f;
   --color-deal: #cc0c39;
   --color-star: #de7921;
+
+  /* Call-to-action buttons */
+  --color-cta: #ffd814;
+  --color-cta-hover: #f7ca00;
+  --color-buy: #ffa41c;
+  --color-buy-hover: #fa8900;
+  --color-success: #067d62;
 }
 
 body {

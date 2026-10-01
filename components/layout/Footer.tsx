@@ -12,7 +12,7 @@ const columns = [
       { label: "Your Account", href: "/account" },
       { label: "Your Orders", href: "/orders" },
       { label: "Your Cart", href: "/cart" },
-      { label: "Today's Deals", href: "/deals" },
+      { label: "Today's Deals", href: "/s?deals=1&sort=discount" },
     ],
   },
 ];

@@ -7,7 +7,11 @@ import { UNFEATURED_CATEGORIES } from "./site";
 import type { Category, Product } from "./types";
 
 const products = productsData as Product[];
-const categories = categoriesData as Category[];
+// DummyJSON names lack apostrophes ("Womens Dresses").
+const categories = (categoriesData as Category[]).map((c) => ({
+  ...c,
+  name: c.name.replace(/\bWomens\b/g, "Women's").replace(/\bMens\b/g, "Men's"),
+}));
 const featurable = products.filter((p) => !UNFEATURED_CATEGORIES.has(p.category));
 
 export function getProducts(): Product[] {
@@ -55,4 +59,9 @@ export function getCategoryCover(slug: string): Product | undefined {
  */
 export function getRatingCount(product: Product): number {
   return 40 + ((product.id * 7919) % 12000);
+}
+
+/** Popularity: rating weighted by how many people rated it. */
+export function getPopularity(product: Product): number {
+  return product.rating * Math.log10(getRatingCount(product));
 }

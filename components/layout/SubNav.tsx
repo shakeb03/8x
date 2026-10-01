@@ -12,7 +12,7 @@ export function SubNav({ departments }: { departments: { slug: string; name: str
           <MenuIcon className="size-5" />
           All
         </Link>
-        <Link href="/deals" className={link}>
+        <Link href="/s?deals=1&sort=discount" className={link}>
           Today&apos;s Deals
         </Link>
         {departments.map((d) => (

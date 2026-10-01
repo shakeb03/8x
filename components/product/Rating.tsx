@@ -21,18 +21,24 @@ function StarRow({ filled }: { filled: boolean }) {
   );
 }
 
-export function Rating({ value, count }: { value: number; count?: number }) {
-  // Round to the nearest half star, like Amazon's display.
+/** Five stars filled to the nearest half. */
+export function Stars({ value }: { value: number }) {
   const rounded = Math.round(value * 2) / 2;
   return (
-    <div className="flex items-center gap-1 text-sm">
-      <span className="text-ink">{value.toFixed(1)}</span>
-      <span className="relative" role="img" aria-label={`${value.toFixed(1)} out of 5 stars`}>
-        <StarRow filled={false} />
-        <span className="absolute inset-y-0 left-0 overflow-hidden" style={{ width: `${(rounded / 5) * 100}%` }}>
-          <StarRow filled />
-        </span>
+    <span className="relative inline-flex" role="img" aria-label={`${value.toFixed(1)} out of 5 stars`}>
+      <StarRow filled={false} />
+      <span className="absolute inset-y-0 left-0 overflow-hidden" style={{ width: `${(rounded / 5) * 100}%` }}>
+        <StarRow filled />
       </span>
+    </span>
+  );
+}
+
+export function Rating({ value, count }: { value: number; count?: number }) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-1 text-sm">
+      <span className="text-ink">{value.toFixed(1)}</span>
+      <Stars value={value} />
       {count !== undefined && <span className="text-link">({formatCount(count)})</span>}
     </div>
   );

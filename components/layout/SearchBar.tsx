@@ -1,13 +1,41 @@
 "use client";
 
 import Form from "next/form";
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { CaretDownIcon, SearchIcon } from "@/components/icons";
 
 type Option = { slug: string; name: string };
+type Props = { departments: Option[] };
 
-export function SearchBar({ departments }: { departments: Option[] }) {
-  const [scope, setScope] = useState("");
+/**
+ * Header search. On results pages it mirrors the current query and scope;
+ * the Suspense fallback is the same bar, empty, for prerendered pages.
+ */
+export function SearchBar({ departments }: Props) {
+  return (
+    <Suspense fallback={<SearchForm departments={departments} />}>
+      <SearchBarFromUrl departments={departments} />
+    </Suspense>
+  );
+}
+
+function SearchBarFromUrl({ departments }: Props) {
+  const params = useSearchParams();
+  const k = params.get("k") ?? "";
+  const i = params.get("i") ?? "";
+  // Remount when the URL changes so the uncontrolled input picks up new values.
+  return <SearchForm key={`${k}|${i}`} departments={departments} initialQuery={k} initialScope={i} />;
+}
+
+function SearchForm({
+  departments,
+  initialQuery = "",
+  initialScope = "",
+}: Props & { initialQuery?: string; initialScope?: string }) {
+  const [scope, setScope] = useState(
+    departments.some((d) => d.slug === initialScope) ? initialScope : "",
+  );
   const scopeLabel = departments.find((d) => d.slug === scope)?.name ?? "All";
 
   return (
@@ -39,6 +67,7 @@ export function SearchBar({ departments }: { departments: Option[] }) {
       <input
         type="search"
         name="k"
+        defaultValue={initialQuery}
         placeholder="Search products, brands and more"
         aria-label="Search"
         autoComplete="off"

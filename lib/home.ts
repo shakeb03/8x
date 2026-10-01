@@ -191,7 +191,7 @@ export type Shelf = { title: string; href: string; products: Product[]; variant?
 
 export function getShelves(): Shelf[] {
   return [
-    { title: "Today's Deals", href: "/deals", products: getDeals(16), variant: "deal" },
+    { title: "Today's Deals", href: "/s?deals=1&sort=discount", products: getDeals(16), variant: "deal" },
     {
       title: "Best sellers in Electronics",
       href: "/s?i=electronics",
