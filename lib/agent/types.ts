@@ -44,3 +44,20 @@ export type AgentReply = {
   context: AgentContext | null;
   suggestions: string[];
 };
+
+/** Everything the in-agent product view needs beyond the result card. */
+export type AgentProductDetail = {
+  slug: string;
+  images: string[];
+  description: string;
+  category: string | null;
+  savings: number;
+  stock: number;
+  available: boolean;
+  maxQuantity: number;
+  delivery: { date: string; cost: number; fast: boolean };
+  shipping: string;
+  warranty: string;
+  returnPolicy: string;
+  dimensions: string;
+};

@@ -1,5 +1,4 @@
 import Image from "next/image";
-import Link from "next/link";
 import { AddToCartButton } from "@/components/product/AddToCartButton";
 import { Stars } from "@/components/product/Rating";
 import { formatCount, formatPrice } from "@/lib/format";
@@ -8,18 +7,21 @@ import type { AgentProduct } from "@/lib/agent/types";
 /** Shared-element name so a tile and the hero morph into each other. */
 export const transitionName = (slug: string) => `agent-${slug}`;
 
-/** The focused result: a large floating image with its details beside it. */
-export function AgentHero({ product: p }: { product: AgentProduct }) {
-  const href = `/dp/${p.slug}`;
+/**
+ * The focused result: a large floating image with its details beside it.
+ * "View details" opens the product inside the agent experience.
+ */
+export function AgentHero({ product: p, onOpen }: { product: AgentProduct; onOpen: () => void }) {
   return (
     <section
       aria-label={`Featured: ${p.title}`}
       className="relative flex h-full flex-col md:rounded-[2rem] md:bg-white/35 md:shadow-[0_40px_90px_-30px_rgba(40,20,120,.35)] md:ring-1 md:ring-white/80"
     >
-      <Link
-        href={href}
+      <button
+        type="button"
+        onClick={onOpen}
         className="group relative block aspect-square w-full overflow-hidden rounded-[2rem] bg-white/35 ring-1 ring-white/80 md:aspect-auto md:min-h-0 md:flex-1 md:bg-transparent md:ring-0"
-        aria-label={`View ${p.title}`}
+        aria-label={`View details for ${p.title}`}
       >
         {/* Spotlight behind the product and a soft ground shadow beneath it.
             On desktop both sit right of the details card, like the image. */}
@@ -44,7 +46,7 @@ export function AgentHero({ product: p }: { product: AgentProduct }) {
             className="object-contain drop-shadow-[0_40px_50px_rgba(30,20,80,.32)] transition-transform duration-700 group-hover:scale-[1.03]"
           />
         </div>
-      </Link>
+      </button>
 
       <div
         key={p.slug}
@@ -70,12 +72,13 @@ export function AgentHero({ product: p }: { product: AgentProduct }) {
           ))}
         </ul>
         <div className="mt-4 flex gap-2">
-          <Link
-            href={href}
+          <button
+            type="button"
+            onClick={onOpen}
             className="flex-1 rounded-full border border-[#d9d2f7] bg-white/80 px-4 py-2 text-center text-sm whitespace-nowrap text-[#3b2f7a] hover:bg-white"
           >
             View details
-          </Link>
+          </button>
           <AddToCartButton slug={p.slug} tone="agent" className="flex-1 py-2 text-sm whitespace-nowrap shadow-none" />
         </div>
       </div>

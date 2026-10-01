@@ -5,12 +5,15 @@ import { flushSync } from "react-dom";
 import { AgentComposer, chipCls } from "@/components/agent/AgentComposer";
 import { AgentHero } from "@/components/agent/AgentHero";
 import { AgentLanding } from "@/components/agent/AgentLanding";
+import { AgentProductView } from "@/components/agent/AgentProductView";
 import { AgentTile } from "@/components/agent/AgentTile";
 import { useAmbientColor } from "@/components/agent/useAmbientColor";
+import { whyThisPick } from "@/components/agent/whyThisPick";
 import { ChevronIcon, SparkleIcon } from "@/components/icons";
 import { askAgent } from "@/lib/agent/actions";
+import { getAgentProductDetail } from "@/lib/agent/product";
 import { STARTER_PROMPTS } from "@/lib/agent/prompts";
-import type { AgentContext, AgentReply } from "@/lib/agent/types";
+import type { AgentContext, AgentProductDetail, AgentReply } from "@/lib/agent/types";
 
 type Step = { id: number; query: string; reply: AgentReply };
 
@@ -51,19 +54,72 @@ export function AgentSearch({ onExit, ambientImages }: { onExit: () => void; amb
   const [active, setActive] = useState(-1);
   const [focus, setFocus] = useState<string | null>(null);
   const [pending, setPending] = useState<string | null>(null);
+  /** Slug of the product open in the focused view, if any. */
+  const [viewing, setViewing] = useState<string | null>(null);
+  const [details, setDetails] = useState<Record<string, AgentProductDetail | null>>({});
   const nextId = useRef(0);
   const input = useRef<HTMLInputElement>(null);
   const caption = useRef<HTMLParagraphElement>(null);
+  const canvas = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     input.current?.focus();
+  }, []);
+
+  // The product view is a browser history entry, so Back returns to results.
+  useEffect(() => {
+    const onPop = (e: PopStateEvent) => {
+      const slug = (e.state as { agentProduct?: string | null } | null)?.agentProduct ?? null;
+      withTransition(() => setViewing(slug));
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
   }, []);
 
   const step = steps[active];
   const products = step?.reply.products ?? [];
   const hero = products.find((p) => p.slug === focus) ?? products[0];
   const others = products.filter((p) => p !== hero);
-  const ambient = useAmbientColor(hero?.image);
+  const viewed = viewing ? products.find((p) => p.slug === viewing) : undefined;
+  const ambient = useAmbientColor((viewed ?? hero)?.image);
+
+  const openProduct = (slug: string) => {
+    const state = { ...window.history.state, agentProduct: slug };
+    if (viewing) window.history.replaceState(state, "");
+    else window.history.pushState(state, "");
+    // The opened product also becomes the hero, so going back lands on it.
+    withTransition(() => {
+      setViewing(slug);
+      setFocus(slug);
+    });
+    canvas.current?.scrollIntoView({ block: "start" });
+    if (!(slug in details)) {
+      getAgentProductDetail(slug)
+        .then((d) => setDetails((m) => ({ ...m, [slug]: d })))
+        .catch(() => {});
+    }
+  };
+
+  const closeProduct = () => {
+    if (window.history.state?.agentProduct) window.history.back(); // popstate closes it
+    else withTransition(() => setViewing(null));
+  };
+
+  /** Leaves the product view without adding history (new search, trail jump). */
+  const dropProductView = () => {
+    if (!viewing) return;
+    window.history.replaceState({ ...window.history.state, agentProduct: null }, "");
+    setViewing(null);
+  };
+
+  useEffect(() => {
+    if (!viewing) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeProduct();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
 
   /** Latest context at or before a step (replies that weren't understood carry none). */
   const contextAt = (index: number): AgentContext | null => {
@@ -83,6 +139,7 @@ export function AgentSearch({ onExit, ambientImages }: { onExit: () => void; amb
       reply = { message: "Something went wrong. Please try again.", products: [], context: null, suggestions: [] };
     }
     withTransition(() => {
+      dropProductView();
       // Asking from an earlier step discards the steps after it.
       setSteps((s) => [...s.slice(0, base + 1), { id: nextId.current++, query, reply }]);
       setActive(base + 1);
@@ -95,11 +152,13 @@ export function AgentSearch({ onExit, ambientImages }: { onExit: () => void; amb
 
   const goTo = (index: number) =>
     withTransition(() => {
+      dropProductView();
       setActive(index);
       setFocus(null);
     });
 
   const restart = () => {
+    dropProductView();
     setSteps([]);
     setActive(-1);
     setFocus(null);
@@ -107,7 +166,8 @@ export function AgentSearch({ onExit, ambientImages }: { onExit: () => void; amb
 
   return (
     <div
-      className="agent-canvas relative isolate min-h-[calc(100dvh-99px)] overflow-x-clip"
+      ref={canvas}
+      className="agent-canvas relative isolate min-h-[calc(100dvh-99px)] scroll-mt-0 overflow-x-clip"
       style={{ "--ambient": ambient ?? "#e9e4ff" } as React.CSSProperties}
     >
       <div className="mx-auto max-w-[1400px] px-4 md:px-6">
@@ -176,6 +236,33 @@ export function AgentSearch({ onExit, ambientImages }: { onExit: () => void; amb
               </p>
             )}
           </AgentLanding>
+        ) : viewed ? (
+          <>
+            <div
+              className={`transition-[opacity,filter] duration-300 ${pending ? "pointer-events-none opacity-50 blur-[2px]" : ""}`}
+              aria-busy={pending !== null}
+            >
+              <AgentProductView
+                product={viewed}
+                detail={details[viewed.slug] ?? null}
+                reasons={whyThisPick(viewed, step.reply.context?.intent ?? null, products)}
+                others={products.filter((p) => p !== viewed)}
+                onBack={closeProduct}
+                onOpen={openProduct}
+              />
+            </div>
+            {/* Still searchable from here; sending returns to results. */}
+            <div className="sticky bottom-0 z-20 mx-auto max-w-2xl pt-6 pb-4 before:pointer-events-none before:absolute before:inset-x-[-50vw] before:top-0 before:bottom-0 before:-z-10 before:bg-gradient-to-t before:from-[#f6f5fb] before:via-[#f6f5fb]/85 before:to-transparent">
+              <AgentComposer
+                variant="dock"
+                inputRef={input}
+                onSend={send}
+                pending={pending !== null}
+                suggestions={[]}
+                placeholder="Keep shopping: “cheaper”, “only Apple”, or something new…"
+              />
+            </div>
+          </>
         ) : (
           <>
             {/* The agent's reply, as a caption rather than a chat bubble */}
@@ -199,7 +286,7 @@ export function AgentSearch({ onExit, ambientImages }: { onExit: () => void; amb
                     others.length ? "md:grid-cols-[minmax(0,2.3fr)_minmax(0,1fr)]" : "md:mx-auto md:max-w-4xl"
                   }`}
                 >
-                  <AgentHero product={hero} />
+                  <AgentHero product={hero} onOpen={() => openProduct(hero.slug)} />
                   {others.length > 0 && (
                     <div className="grid grid-cols-2 gap-3 md:h-full md:grid-rows-3 md:gap-2.5">
                       {others.map((p, i) => (
