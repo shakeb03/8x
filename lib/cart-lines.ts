@@ -1,25 +1,26 @@
 // Turns stored cart items into priced lines. Shared by the cart and checkout.
 
 import type { CartItem } from "./cart-store";
+import { isAvailable, maxQuantity } from "./stock";
 import type { CartProduct } from "./types";
 
-export const MAX_QUANTITY = 10;
+export { maxQuantity };
 
 export type CartLine = { product: CartProduct; quantity: number };
 
-export const isUnavailable = (p: CartProduct) =>
-  p.stock === 0 || p.availabilityStatus === "Out of Stock";
-
-export const maxQuantity = (p: CartProduct) => Math.max(1, Math.min(MAX_QUANTITY, p.stock));
+export const isUnavailable = (p: CartProduct) => !isAvailable(p);
 
 /**
  * Items whose product no longer exists in the catalog are dropped, and
- * quantities are capped at current stock.
+ * quantities of buyable items are capped at current stock. Unavailable items
+ * keep their stored quantity; they're excluded from totals instead.
  */
 export function buildCartLines(items: CartItem[], catalog: Record<string, CartProduct>): CartLine[] {
   return items.flatMap((i) => {
     const product = catalog[i.slug];
-    return product ? [{ product, quantity: Math.min(i.quantity, maxQuantity(product)) }] : [];
+    if (!product) return [];
+    const quantity = isAvailable(product) ? Math.min(i.quantity, maxQuantity(product)) : i.quantity;
+    return [{ product, quantity }];
   });
 }
 

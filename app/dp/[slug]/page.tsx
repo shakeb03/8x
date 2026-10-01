@@ -11,6 +11,7 @@ import { getCategory, getProductBySlug, getRatingCount, getRelated } from "@/lib
 import { deliveryDate, FREE_SHIPPING_THRESHOLD, isFastShipping, shippingCost } from "@/lib/delivery";
 import { formatCount, formatPrice, listPrice, savingsPercent } from "@/lib/format";
 import { BRAND, getDepartmentForCategory } from "@/lib/site";
+import { isAvailable, maxQuantity } from "@/lib/stock";
 import type { Product } from "@/lib/types";
 
 export async function generateMetadata(props: PageProps<"/dp/[slug]">): Promise<Metadata> {
@@ -33,7 +34,7 @@ function aboutBullets(p: Product): string[] {
 }
 
 function StockStatus({ product }: { product: Product }) {
-  if (product.stock === 0 || product.availabilityStatus === "Out of Stock") {
+  if (!isAvailable(product)) {
     return <p className="text-lg text-deal">Currently unavailable.</p>;
   }
   if (product.stock < 10) {
@@ -51,7 +52,7 @@ export default async function ProductPage(props: PageProps<"/dp/[slug]">) {
   const category = getCategory(product.category);
   const savings = savingsPercent(product);
   const shipping = shippingCost(product);
-  const available = product.stock > 0 && product.availabilityStatus !== "Out of Stock";
+  const available = isAvailable(product);
   const related = getRelated(product, department?.categories ?? [], 14);
 
   const delivery = (
@@ -152,7 +153,7 @@ export default async function ProductPage(props: PageProps<"/dp/[slug]">) {
 
             {available && (
               <div className="mt-3">
-                <BuyActions slug={product.slug} stock={product.stock} />
+                <BuyActions slug={product.slug} max={maxQuantity(product)} />
               </div>
             )}
 

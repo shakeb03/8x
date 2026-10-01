@@ -8,6 +8,7 @@ import { deliveryDate, isFastShipping } from "../delivery";
 import { formatPrice, listPrice, savingsPercent } from "../format";
 import { matchConcepts, tokenize } from "../search";
 import { UNFEATURED_CATEGORIES } from "../site";
+import { isAvailable } from "../stock";
 import type { Product } from "../types";
 import { STARTER_PROMPTS } from "./prompts";
 import type { AgentContext, AgentIntent, AgentProduct, AgentReply, AgentSort } from "./types";
@@ -375,8 +376,6 @@ function resolveIntent(p: Parsed, context: AgentContext | null): { intent: Agent
 }
 
 // --- Retrieval ---------------------------------------------------------------
-
-const isAvailable = (p: Product) => p.stock > 0 && p.availabilityStatus !== "Out of Stock";
 
 /**
  * The concept that names the product itself. Descriptors usually come first

@@ -4,14 +4,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { CaretDownIcon } from "@/components/icons";
-import { MAX_QUANTITY, useCartStore } from "@/lib/cart-store";
+import { useCartStore } from "@/lib/cart-store";
 
-export function BuyActions({ slug, stock }: { slug: string; stock: number }) {
+/** `max` comes from the shared stock rules (only rendered for buyable products). */
+export function BuyActions({ slug, max }: { slug: string; max: number }) {
   const add = useCartStore((s) => s.add);
   const router = useRouter();
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState<number | null>(null);
-  const max = Math.max(1, Math.min(MAX_QUANTITY, stock));
 
   const button =
     "w-full rounded-full py-2 text-sm text-ink shadow-[0_2px_5px_rgba(213,217,217,.5)] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-link";

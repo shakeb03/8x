@@ -56,8 +56,13 @@ export function AgentSearch({ onExit, ambientImages }: { onExit: () => void; amb
   const [pending, setPending] = useState<string | null>(null);
   /** Slug of the product open in the focused view, if any. */
   const [viewing, setViewing] = useState<string | null>(null);
+  /** Fetched product details: missing = loading, null = failed or not found. */
   const [details, setDetails] = useState<Record<string, AgentProductDetail | null>>({});
   const nextId = useRef(0);
+  /** Identifies the latest request; bumping it makes an in-flight reply stale. */
+  const requestId = useRef(0);
+  /** Synchronous guard, since `pending` can be stale on a quick double submit. */
+  const busy = useRef(false);
   const input = useRef<HTMLInputElement>(null);
   const caption = useRef<HTMLParagraphElement>(null);
   const canvas = useRef<HTMLDivElement>(null);
@@ -93,10 +98,16 @@ export function AgentSearch({ onExit, ambientImages }: { onExit: () => void; amb
       setFocus(slug);
     });
     canvas.current?.scrollIntoView({ block: "start" });
-    if (!(slug in details)) {
+    // Fetch once per product; a previous failure (null) is retried.
+    if (!details[slug]) {
+      setDetails((m) => {
+        const next = { ...m };
+        delete next[slug]; // back to "loading"
+        return next;
+      });
       getAgentProductDetail(slug)
         .then((d) => setDetails((m) => ({ ...m, [slug]: d })))
-        .catch(() => {});
+        .catch(() => setDetails((m) => ({ ...m, [slug]: null })));
     }
   };
 
@@ -129,7 +140,9 @@ export function AgentSearch({ onExit, ambientImages }: { onExit: () => void; amb
 
   const send = async (text: string) => {
     const query = text.trim();
-    if (!query || pending) return;
+    if (!query || busy.current) return;
+    busy.current = true;
+    const id = ++requestId.current;
     const base = active;
     setPending(query);
     let reply: AgentReply;
@@ -138,6 +151,9 @@ export function AgentSearch({ onExit, ambientImages }: { onExit: () => void; amb
     } catch {
       reply = { message: "Something went wrong. Please try again.", products: [], context: null, suggestions: [] };
     }
+    // The shopper moved on (new search, trail jump) while this was loading.
+    if (id !== requestId.current) return;
+    busy.current = false;
     withTransition(() => {
       dropProductView();
       // Asking from an earlier step discards the steps after it.
@@ -150,14 +166,23 @@ export function AgentSearch({ onExit, ambientImages }: { onExit: () => void; amb
     input.current?.focus();
   };
 
+  /** Abandons any in-flight request; its reply will be ignored. */
+  const cancelPending = () => {
+    requestId.current++;
+    busy.current = false;
+    setPending(null);
+  };
+
   const goTo = (index: number) =>
     withTransition(() => {
+      cancelPending();
       dropProductView();
       setActive(index);
       setFocus(null);
     });
 
   const restart = () => {
+    cancelPending();
     dropProductView();
     setSteps([]);
     setActive(-1);
@@ -244,7 +269,7 @@ export function AgentSearch({ onExit, ambientImages }: { onExit: () => void; amb
             >
               <AgentProductView
                 product={viewed}
-                detail={details[viewed.slug] ?? null}
+                detail={details[viewed.slug]}
                 reasons={whyThisPick(viewed, step.reply.context?.intent ?? null, products)}
                 others={products.filter((p) => p !== viewed)}
                 onBack={closeProduct}

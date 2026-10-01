@@ -6,12 +6,21 @@ import { persist } from "zustand/middleware";
 
 export type CartItem = { slug: string; quantity: number };
 
-import { MAX_QUANTITY } from "./cart-lines";
+import { MAX_QUANTITY } from "./stock";
 
-/** Per-item limit, like Amazon's quantity dropdown. Stock may lower it further. */
 export { MAX_QUANTITY };
 
 const clamp = (n: number) => Math.min(MAX_QUANTITY, n);
+
+/** Bump when the saved shape changes, and handle the old shape in `migrate`. */
+const CART_VERSION = 1;
+
+const isCartItem = (v: unknown): v is CartItem =>
+  typeof v === "object" &&
+  v !== null &&
+  typeof (v as CartItem).slug === "string" &&
+  Number.isInteger((v as CartItem).quantity) &&
+  (v as CartItem).quantity > 0;
 
 type CartState = {
   items: CartItem[];
@@ -45,7 +54,22 @@ export const useCartStore = create<CartState>()(
       remove: (slug) => set((s) => ({ items: s.items.filter((i) => i.slug !== slug) })),
       clear: () => set({ items: [] }),
     }),
-    { name: "cart" },
+    {
+      name: "cart",
+      version: CART_VERSION,
+      // v0 → v1: same shape; versioning starts here.
+      migrate: (persisted) => persisted as CartState,
+      // Keep only well-formed items, so bad saved data can't break the cart.
+      merge: (persisted, current) => {
+        const items = (persisted as { items?: unknown } | null)?.items;
+        return {
+          ...current,
+          items: Array.isArray(items)
+            ? items.filter(isCartItem).map((i) => ({ slug: i.slug, quantity: clamp(i.quantity) }))
+            : current.items,
+        };
+      },
+    },
   ),
 );
 

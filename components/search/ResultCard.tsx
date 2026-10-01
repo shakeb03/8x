@@ -6,13 +6,14 @@ import { Rating } from "@/components/product/Rating";
 import { getRatingCount } from "@/lib/catalog";
 import { deliveryDate, shippingCost } from "@/lib/delivery";
 import { formatPrice, listPrice, savingsPercent } from "@/lib/format";
+import { isAvailable } from "@/lib/stock";
 import type { Product } from "@/lib/types";
 
 export function ResultCard({ product, preload }: { product: Product; preload?: boolean }) {
   const href = `/dp/${product.slug}`;
   const savings = savingsPercent(product);
   const shipping = shippingCost(product);
-  const outOfStock = product.stock === 0 || product.availabilityStatus === "Out of Stock";
+  const outOfStock = !isAvailable(product);
 
   return (
     <article className="group flex flex-col overflow-hidden rounded-md border border-[#e3e6e6] bg-white">

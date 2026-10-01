@@ -14,8 +14,11 @@ import { transitionName } from "./AgentHero";
 
 type Props = {
   product: AgentProduct;
-  /** Null while the fuller data loads; the view renders from `product` meanwhile. */
-  detail: AgentProductDetail | null;
+  /**
+   * Fuller data: undefined while loading (the view renders from `product`
+   * meanwhile), null if it couldn't be loaded.
+   */
+  detail: AgentProductDetail | null | undefined;
   reasons: string[];
   /** The other results from the current search, for quick switching. */
   others: AgentProduct[];
@@ -90,7 +93,13 @@ export function AgentProductView({ product: p, detail, reasons, others, onBack, 
 
           {/* Delivery, stock, quantity, and actions */}
           <section aria-label="Buy" className={`agent-rise ${panel}`} style={{ animationDelay: "80ms" }}>
-            {detail ? <Purchase product={p} detail={detail} /> : <PurchaseSkeleton />}
+            {detail ? (
+              <Purchase product={p} detail={detail} />
+            ) : detail === null ? (
+              <PurchaseFallback product={p} />
+            ) : (
+              <PurchaseSkeleton />
+            )}
           </section>
 
           {/* Key details */}
@@ -290,6 +299,19 @@ function Purchase({ product: p, detail }: { product: AgentProduct; detail: Agent
           Buy now
         </button>
       </div>
+    </div>
+  );
+}
+
+/** Shown if delivery/stock details couldn't be loaded: buying still works. */
+function PurchaseFallback({ product: p }: { product: AgentProduct }) {
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-sm text-[#5f5a78]">We couldn&apos;t load delivery and stock details right now.</p>
+      <AddToCartButton slug={p.slug} tone="agent" className="py-2.5 text-sm shadow-none" />
+      <Link href={`/dp/${p.slug}`} className="text-xs text-[#6a5bb0] hover:text-agent hover:underline">
+        Open the full product page ↗
+      </Link>
     </div>
   );
 }

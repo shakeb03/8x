@@ -1,7 +1,7 @@
 "use server";
 
 import { getCategory, getProductBySlug } from "../catalog";
-import { MAX_QUANTITY } from "../cart-lines";
+import { isAvailable, maxQuantity } from "../stock";
 import { deliveryDate, isFastShipping, shippingCost } from "../delivery";
 import { savingsPercent } from "../format";
 import type { AgentProductDetail } from "./types";
@@ -10,7 +10,7 @@ import type { AgentProductDetail } from "./types";
 export async function getAgentProductDetail(slug: string): Promise<AgentProductDetail | null> {
   const p = typeof slug === "string" ? getProductBySlug(slug) : undefined;
   if (!p) return null;
-  const available = p.stock > 0 && p.availabilityStatus !== "Out of Stock";
+  const available = isAvailable(p);
   const { width, height, depth } = p.dimensions;
   return {
     slug: p.slug,
@@ -20,7 +20,7 @@ export async function getAgentProductDetail(slug: string): Promise<AgentProductD
     savings: savingsPercent(p),
     stock: p.stock,
     available,
-    maxQuantity: available ? Math.min(MAX_QUANTITY, p.stock) : 0,
+    maxQuantity: maxQuantity(p),
     delivery: { date: deliveryDate(p), cost: shippingCost(p), fast: isFastShipping(p) },
     shipping: p.shippingInformation,
     warranty: p.warrantyInformation,
