@@ -12,15 +12,27 @@ export const transitionName = (slug: string) => `agent-${slug}`;
 export function AgentHero({ product: p }: { product: AgentProduct }) {
   const href = `/dp/${p.slug}`;
   return (
-    <section aria-label={`Featured: ${p.title}`} className="relative flex h-full flex-col">
+    <section
+      aria-label={`Featured: ${p.title}`}
+      className="relative flex h-full flex-col md:rounded-[2rem] md:bg-white/35 md:shadow-[0_40px_90px_-30px_rgba(40,20,120,.35)] md:ring-1 md:ring-white/80"
+    >
       <Link
         href={href}
-        className="group relative block aspect-square w-full md:aspect-auto md:min-h-0 md:flex-1"
+        className="group relative block aspect-square w-full overflow-hidden rounded-[2rem] bg-white/35 ring-1 ring-white/80 md:aspect-auto md:min-h-0 md:flex-1 md:bg-transparent md:ring-0"
         aria-label={`View ${p.title}`}
       >
-        {/* On desktop the image sits right of the details card instead of under it. */}
+        {/* Spotlight behind the product and a soft ground shadow beneath it.
+            On desktop both sit right of the details card, like the image. */}
         <div
-          className="absolute inset-[6%] md:inset-y-[5%] md:right-[3%] md:left-[33%]"
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(closest-side_at_50%_48%,rgba(255,255,255,.95),rgba(255,255,255,.45)_55%,transparent)] md:left-[26%]"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute bottom-[6%] left-1/2 h-8 w-[45%] -translate-x-1/2 rounded-[50%] bg-[#1b1240]/20 blur-2xl md:left-[64%] md:w-[38%]"
+        />
+        <div
+          className="absolute inset-[4%] md:inset-y-[3%] md:right-[2%] md:left-[30%]"
           style={{ viewTransitionName: transitionName(p.slug) }}
         >
           <Image
@@ -28,18 +40,18 @@ export function AgentHero({ product: p }: { product: AgentProduct }) {
             alt={p.title}
             fill
             preload
-            sizes="(min-width: 768px) 55vw, 100vw"
-            className="object-contain drop-shadow-[0_30px_40px_rgba(30,20,80,.25)] transition-transform duration-700 group-hover:scale-[1.03]"
+            sizes="(min-width: 768px) 65vw, 100vw"
+            className="object-contain drop-shadow-[0_40px_50px_rgba(30,20,80,.32)] transition-transform duration-700 group-hover:scale-[1.03]"
           />
         </div>
       </Link>
 
       <div
         key={p.slug}
-        className="agent-rise relative mt-2 rounded-3xl bg-white/70 p-5 shadow-[0_10px_40px_rgba(40,20,120,.10)] ring-1 ring-white/60 backdrop-blur-xl md:absolute md:bottom-4 md:left-4 md:mt-0 md:w-[22rem]"
+        className="agent-rise relative mt-2 rounded-3xl bg-white/70 p-5 shadow-[0_10px_40px_rgba(40,20,120,.10)] ring-1 ring-white/60 backdrop-blur-xl md:absolute md:bottom-5 md:left-5 md:mt-0 md:w-[23rem]"
       >
         {p.brand && <p className="text-[11px] font-semibold tracking-[.14em] text-[#6a5bb0] uppercase">{p.brand}</p>}
-        <h2 className="mt-0.5 font-display text-2xl leading-tight font-extrabold tracking-tight text-[#17122b]">
+        <h2 className="mt-0.5 font-display text-2xl leading-tight font-extrabold tracking-tight text-[#17122b] md:text-3xl">
           {p.title}
         </h2>
         <div className="mt-1.5 flex items-center gap-1.5 text-xs text-[#5f5a78]">
@@ -47,7 +59,7 @@ export function AgentHero({ product: p }: { product: AgentProduct }) {
           {p.rating.toFixed(1)} · {formatCount(p.ratingCount)} ratings
         </div>
         <p className="mt-2 flex items-baseline gap-2">
-          <span className="text-3xl font-semibold text-[#17122b]">{formatPrice(p.price)}</span>
+          <span className="text-3xl font-semibold text-[#17122b] md:text-4xl">{formatPrice(p.price)}</span>
           {p.listPrice && <span className="text-sm text-[#8d88a3] line-through">{formatPrice(p.listPrice)}</span>}
         </p>
         <ul className="mt-2 flex flex-wrap gap-1.5">

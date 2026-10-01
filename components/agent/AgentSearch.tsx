@@ -107,7 +107,7 @@ export function AgentSearch({ onExit, ambientImages }: { onExit: () => void; amb
 
   return (
     <div
-      className="agent-canvas relative isolate min-h-[calc(100dvh-99px)]"
+      className="agent-canvas relative isolate min-h-[calc(100dvh-99px)] overflow-x-clip"
       style={{ "--ambient": ambient ?? "#e9e4ff" } as React.CSSProperties}
     >
       <div className="mx-auto max-w-[1400px] px-4 md:px-6">
@@ -196,12 +196,12 @@ export function AgentSearch({ onExit, ambientImages }: { onExit: () => void; amb
               {hero ? (
                 <div
                   className={`grid gap-4 md:h-[clamp(440px,calc(100dvh-360px),680px)] ${
-                    others.length ? "md:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]" : "md:mx-auto md:max-w-3xl"
+                    others.length ? "md:grid-cols-[minmax(0,2.3fr)_minmax(0,1fr)]" : "md:mx-auto md:max-w-4xl"
                   }`}
                 >
                   <AgentHero product={hero} />
                   {others.length > 0 && (
-                    <div className="grid grid-cols-2 gap-3 md:h-full md:grid-rows-3">
+                    <div className="grid grid-cols-2 gap-3 md:h-full md:grid-rows-3 md:gap-2.5">
                       {others.map((p, i) => (
                         <AgentTile
                           key={`${step.id}-${p.slug}`}
@@ -230,7 +230,8 @@ export function AgentSearch({ onExit, ambientImages }: { onExit: () => void; amb
             </div>
 
             {/* Floating prompt */}
-            <div className="sticky bottom-0 z-20 mx-auto max-w-2xl pt-6 pb-4">
+            {/* The fade behind it keeps chips legible over content scrolling beneath. */}
+            <div className="sticky bottom-0 z-20 mx-auto max-w-2xl pt-6 pb-4 before:pointer-events-none before:absolute before:inset-x-[-50vw] before:top-0 before:bottom-0 before:-z-10 before:bg-gradient-to-t before:from-[#f6f5fb] before:via-[#f6f5fb]/85 before:to-transparent">
               <AgentComposer
                 variant="dock"
                 inputRef={input}
