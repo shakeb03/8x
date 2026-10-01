@@ -1,11 +1,42 @@
 @import "tailwindcss";
 
 @theme inline {
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-archivo);
+}
+
+@theme {
+  /* Header / footer navy scale */
+  --color-nav: #131921;
+  --color-nav-2: #232f3e;
+  --color-nav-3: #37475a;
+  --color-nav-4: #485769;
+
+  /* Search button + accents */
+  --color-accent: #febd69;
+  --color-accent-hover: #f3a847;
+  --color-focus: #f90;
+  --color-badge: #f08804;
+
+  /* Page surfaces + text */
+  --color-page: #e3e6e6;
+  --color-ink: #0f1111;
+  --color-muted: #565959;
+  --color-link: #007185;
+  --color-link-hover: #c7511f;
+  --color-deal: #cc0c39;
+  --color-star: #de7921;
 }
 
 body {
-  background: #ffffff;
-  color: #0f1111;
+  background: var(--color-page);
+  color: var(--color-ink);
+}
+
+/* Horizontal scrollers hide their scrollbar; arrows + swipe handle navigation. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
