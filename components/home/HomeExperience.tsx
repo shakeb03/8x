@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { flushSync } from "react-dom";
 import { AgentSearch } from "@/components/agent/AgentSearch";
 import { SparkleIcon } from "@/components/icons";
+import { playAgentEntrance } from "./agentEntrance";
 
 /**
  * Switches the homepage between the classic storefront (server-rendered,
@@ -10,13 +12,21 @@ import { SparkleIcon } from "@/components/icons";
  */
 export function HomeExperience({ children, ambientImages }: { children: ReactNode; ambientImages: string[] }) {
   const [agent, setAgent] = useState(false);
+  const [entering, setEntering] = useState(false);
 
-  const toggle = (on: boolean) => {
-    setAgent(on);
+  const enter = async () => {
+    if (entering) return;
+    setEntering(true);
+    await playAgentEntrance(ambientImages, () => flushSync(() => setAgent(true)));
+    setEntering(false);
+  };
+
+  const exit = () => {
+    setAgent(false);
     window.scrollTo({ top: 0 });
   };
 
-  if (agent) return <AgentSearch onExit={() => toggle(false)} ambientImages={ambientImages} />;
+  if (agent) return <AgentSearch onExit={exit} ambientImages={ambientImages} />;
 
   return (
     <>
@@ -33,7 +43,8 @@ export function HomeExperience({ children, ambientImages }: { children: ReactNod
           </div>
           <button
             type="button"
-            onClick={() => toggle(true)}
+            onClick={enter}
+            disabled={entering}
             className="flex shrink-0 items-center gap-1.5 rounded-full bg-white px-4 py-2 text-sm font-semibold text-agent shadow-sm transition-transform hover:scale-[1.03]"
           >
             <SparkleIcon className="size-4" /> Try Agentic Search
