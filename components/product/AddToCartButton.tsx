@@ -3,9 +3,20 @@
 import { useEffect, useState } from "react";
 import { useCartStore } from "@/lib/cart-store";
 
-type Props = { slug: string; quantity?: number; className?: string };
+type Props = {
+  slug: string;
+  quantity?: number;
+  className?: string;
+  /** "agent" matches the Agentic Search styling. */
+  tone?: "default" | "agent";
+};
 
-export function AddToCartButton({ slug, quantity = 1, className = "" }: Props) {
+const IDLE = {
+  default: "bg-cta text-ink hover:bg-cta-hover active:bg-[#f0b800]",
+  agent: "bg-agent text-white hover:bg-agent-hover",
+};
+
+export function AddToCartButton({ slug, quantity = 1, className = "", tone = "default" }: Props) {
   const add = useCartStore((s) => s.add);
   const [added, setAdded] = useState(false);
 
@@ -24,9 +35,7 @@ export function AddToCartButton({ slug, quantity = 1, className = "" }: Props) {
       }}
       aria-live="polite"
       className={`rounded-full px-4 py-1.5 text-[13px] shadow-[0_2px_5px_rgba(213,217,217,.5)] transition-colors ${
-        added
-          ? "bg-success text-white"
-          : "bg-cta text-ink hover:bg-cta-hover active:bg-[#f0b800]"
+        added ? "bg-success text-white" : IDLE[tone]
       } ${className}`}
     >
       {added ? "✓ Added to cart" : "Add to cart"}

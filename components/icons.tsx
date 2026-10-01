@@ -86,3 +86,20 @@ export function MinusIcon({ className }: IconProps) {
     </svg>
   );
 }
+
+export function SparkleIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
+      <path d="M12 2.5l1.9 5.6 5.6 1.9-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.9z" />
+      <path d="M19 15l.8 2.2 2.2.8-2.2.8L19 21l-.8-2.2-2.2-.8 2.2-.8z" opacity=".7" />
+    </svg>
+  );
+}
+
+export function ArrowUpIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
+      <path d="M12 19V5M5 12l7-7 7 7" />
+    </svg>
+  );
+}

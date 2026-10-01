@@ -33,6 +33,11 @@
   --color-buy: #ffa41c;
   --color-buy-hover: #fa8900;
   --color-success: #067d62;
+
+  /* Agentic Search */
+  --color-agent: #5b3fd6;
+  --color-agent-hover: #4a30be;
+  --color-agent-soft: #f1edff;
 }
 
 body {

@@ -89,7 +89,7 @@ function stem(w: string): string {
   return w;
 }
 
-const tokenize = (s: string) =>
+export const tokenize = (s: string) =>
   normalize(s)
     .split(/[\s-]+/)
     .filter((w) => w.length > 1)
@@ -115,30 +115,59 @@ const index: Indexed[] = getProducts().map((product) => ({
 }));
 
 /**
- * Every query word must match some field (AND). Exact word matches score
+ * How well one (stemmed) term matches a product. Exact word matches score
  * highest; partial matches (prefix for 3+ chars: "mac" → "macbook", substring
  * for 4+ chars: "phone" → "smartphone") count for less, and are skipped for
  * descriptions where they mostly add noise.
  */
+function termScore(entry: Indexed, term: string): number {
+  let best = 0;
+  for (const { tokens, weight } of entry.fields) {
+    if (tokens.has(term)) {
+      best = Math.max(best, weight * 2);
+      continue;
+    }
+    if (weight < 2 || term.length < 3) continue;
+    for (const t of tokens) {
+      if (t.startsWith(term)) best = Math.max(best, weight * 0.75);
+      else if (term.length >= 4 && t.includes(term)) best = Math.max(best, weight * 0.5);
+    }
+  }
+  return best;
+}
+
+/** Every query word must match some field (AND). */
 function score(entry: Indexed, terms: string[]): number {
   let total = 0;
   for (const term of terms) {
-    let best = 0;
-    for (const { tokens, weight } of entry.fields) {
-      if (tokens.has(term)) {
-        best = Math.max(best, weight * 2);
-        continue;
-      }
-      if (weight < 2 || term.length < 3) continue;
-      for (const t of tokens) {
-        if (t.startsWith(term)) best = Math.max(best, weight * 0.75);
-        else if (term.length >= 4 && t.includes(term)) best = Math.max(best, weight * 0.5);
-      }
-    }
+    const best = termScore(entry, term);
     if (best === 0) return 0;
     total += best;
   }
   return total;
+}
+
+/**
+ * Looser matching for natural-language queries: each group is a concept with
+ * interchangeable terms (synonyms), and products are scored by how many
+ * groups they satisfy rather than requiring all of them.
+ */
+export function matchConcepts(
+  groups: string[][],
+): { product: Product; matched: number; score: number; hits: boolean[] }[] {
+  return index.map((entry) => {
+    let matched = 0;
+    let total = 0;
+    const hits = groups.map((group) => {
+      const best = Math.max(0, ...group.map((t) => termScore(entry, t)));
+      if (best > 0) {
+        matched++;
+        total += best;
+      }
+      return best > 0;
+    });
+    return { product: entry.product, matched, score: total, hits };
+  });
 }
 
 // --- Search ------------------------------------------------------------------
